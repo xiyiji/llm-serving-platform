@@ -4,8 +4,6 @@ A self-hosted serving layer for LLM inference: one OpenAI-compatible gateway in
 front of your model engines, with adaptive routing, dynamic micro-batching,
 prefix caching, cold-start management, canary releases and a real ops console.
 
-**Live demo:** [llm-serving-platform.vercel.app](https://llm-serving-platform.vercel.app) — console on Vercel, gateway on Render; with a GPU engine attached, chat responses stream from a real vLLM instance through the full gateway path.
-
 Point any OpenAI SDK at it:
 
 ```python
@@ -111,6 +109,21 @@ serves the median request in half the time of the uncached run, and the tail
 is not noise — it is the cold start of the second model (~1.2 s load),
 captured exactly where a tail percentile should capture it. Rerun with
 `make bench`, or `--unique-prompts` for the cache-off case.
+
+The same harness, pointed at the deployed public chain — gateway on Render
+fronting a vLLM engine (Qwen2.5-7B-Instruct on an RTX 4090, RunPod) — with
+60 requests at concurrency 8, over the public internet:
+
+| Scenario | p50 | p95 | Throughput | Cache hits | Errors |
+|---|---|---|---|---|---|
+| Unique prompts | 3411 ms | 8079 ms | 2.0 req/s | 0% | 0 |
+| Repeated prompts | 91 ms | 3315 ms | 12.6 req/s | 85% | 0 |
+
+Unique prompts pay the full price: real 64-token decode on the GPU plus two
+public network hops. With repeated prompts the gateway's prefix cache
+answers the median request in 91 ms — **37× under the GPU path** — while
+misses still stream from the engine. That gap is the reason the gateway
+layer exists.
 
 ## Plugging in a real engine
 
