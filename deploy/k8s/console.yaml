@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console
+  namespace: llm-serving
+  labels: { app: console }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: console }
+  template:
+    metadata:
+      labels: { app: console }
+    spec:
+      containers:
+        - name: console
+          image: llm-serving-platform/console:latest
+          ports: [{ containerPort: 3000 }]
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: console
+  namespace: llm-serving
+spec:
+  selector: { app: console }
+  ports: [{ port: 3000, targetPort: 3000 }]

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        working-directory: backend
+        run: pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+      - name: Type-check and build
+        working-directory: frontend
+        run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build gateway image
+        run: docker build -t llm-serving-platform/gateway:ci backend
+      - name: Build console image
+        run: docker build -t llm-serving-platform/console:ci frontend
+      - name: Smoke test gateway container
+        run: |
+          docker run -d --name gw -p 8000:8000 llm-serving-platform/gateway:ci
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/health && break || sleep 1
+          done
+          curl -sf -X POST http://localhost:8000/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"messages":[{"role":"user","content":"smoke test"}]}' | grep -q '"text"'
+          docker rm -f gw

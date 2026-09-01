@@ -1,0 +1,42 @@
+{
+  "title": "LLM Serving Platform",
+  "uid": "llm-gateway",
+  "timezone": "browser",
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Request rate by endpoint",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"expr": "sum by (endpoint) (rate(gateway_requests_total[1m]))"}]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "p50 / p95 / p99 latency",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, rate(gateway_request_latency_seconds_bucket[5m]))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, rate(gateway_request_latency_seconds_bucket[5m]))", "legendFormat": "p95"},
+        {"expr": "histogram_quantile(0.99, rate(gateway_request_latency_seconds_bucket[5m]))", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Token throughput",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+      "targets": [{"expr": "sum by (kind) (rate(gateway_tokens_total[1m]))"}]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Cache hit ratio",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+      "targets": [{"expr": "rate(gateway_cache_events_total{result=\"hit\"}[5m]) / clamp_min(rate(gateway_cache_events_total[5m]), 1e-9)"}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "In-flight requests / cold starts",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+      "targets": [
+        {"expr": "gateway_active_requests", "legendFormat": "active"},
+        {"expr": "rate(gateway_cold_start_seconds_count[5m])", "legendFormat": "cold starts/s"}
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

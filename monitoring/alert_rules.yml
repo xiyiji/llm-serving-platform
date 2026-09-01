@@ -1,0 +1,23 @@
+groups:
+  - name: gateway
+    rules:
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, rate(gateway_request_latency_seconds_bucket[5m])) > 2
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "p95 latency above 2s" }
+      - alert: HighErrorRate
+        expr: rate(gateway_errors_total[5m]) / clamp_min(rate(gateway_requests_total[5m]), 1e-9) > 0.05
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "error rate above 5%" }
+      - alert: QueuePressure
+        expr: gateway_active_requests > 32
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: "sustained in-flight request pressure" }
+      - alert: SlowColdStarts
+        expr: histogram_quantile(0.95, rate(gateway_cold_start_seconds_bucket[10m])) > 2
+        for: 5m
+        labels: { severity: info }
+        annotations: { summary: "model cold starts slower than 2s" }

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: llm-serving
+data:
+  LSP_LOG_LEVEL: INFO
+  LSP_ROUTING_STRATEGY: adaptive
+  # LSP_UPSTREAM_BASE_URL: http://vllm.llm-serving.svc:8001/v1
+  # LSP_UPSTREAM_MODELS: llama-3.1-8b-instruct
