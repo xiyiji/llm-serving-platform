@@ -1,0 +1,20 @@
+# Render Blueprint: deploys the gateway as a Docker web service.
+# The console goes to Vercel separately (see docs/DEPLOY.md).
+services:
+  - type: web
+    name: llm-serving-gateway
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: LSP_LOG_LEVEL
+        value: INFO
+      # Point at a live GPU engine (vLLM / InferenceGateway) when one is up:
+      # - key: LSP_UPSTREAM_BASE_URL
+      #   value: https://<your-gpu-endpoint>/v1
+      # - key: LSP_UPSTREAM_MODELS
+      #   value: llama-3.1-8b-instruct
+      # - key: LSP_UPSTREAM_API_KEY
+      #   sync: false

@@ -146,6 +146,10 @@ is on by default and tunable via `LSP_RATE_LIMIT_RPS` / `_BURST`.
 
 ## Deploy
 
+[`docs/DEPLOY.md`](docs/DEPLOY.md) covers the three tiers: local compose, a
+free public demo on Render + Vercel, and pointing the deployed gateway at a
+rented GPU running vLLM for real inference.
+
 `deploy/k8s/` has the manifests (2-replica gateway with probes and rolling
 updates, console, HPA, config); `deploy/terraform/` provisions ECR + EKS.
 CI runs the test matrix, builds both images and smoke-tests the gateway

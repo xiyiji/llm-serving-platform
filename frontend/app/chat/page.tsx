@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_API_BASE,
   getJson,
@@ -10,7 +10,7 @@ import {
   type CompletionResponse,
 } from "@/lib/api";
 
-const MODELS = ["llama-3.1-8b-instruct", "mistral-7b-instruct"];
+const DEFAULT_MODELS = ["llama-3.1-8b-instruct", "mistral-7b-instruct"];
 
 interface UiMessage extends ChatMessage {
   meta?: string;
@@ -20,7 +20,23 @@ interface UiMessage extends ChatMessage {
 export default function ChatPage() {
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(MODELS[0]);
+  const [models, setModels] = useState<string[]>(DEFAULT_MODELS);
+  const [model, setModel] = useState(DEFAULT_MODELS[0]);
+
+  // Populate the model list from whatever the gateway actually serves.
+  useEffect(() => {
+    let cancelled = false;
+    getJson<{ models: { id: string }[] }>(apiBase, "/v1/models", apiKey)
+      .then((res) => {
+        const ids = res.models.map((m) => m.id);
+        if (!cancelled && ids.length) {
+          setModels(ids);
+          setModel((cur) => (ids.includes(cur) ? cur : ids[0]));
+        }
+      })
+      .catch(() => {}); // backend offline: keep defaults
+    return () => { cancelled = true; };
+  }, [apiBase, apiKey]);
   const [systemPrompt, setSystemPrompt] = useState(
     "You are a helpful assistant for debugging infrastructure and system design questions."
   );
@@ -173,7 +189,7 @@ export default function ChatPage() {
 
         <label className="field">Model</label>
         <select className="text" value={model} onChange={(e) => setModel(e.target.value)}>
-          {MODELS.map((m) => <option key={m}>{m}</option>)}
+          {models.map((m) => <option key={m}>{m}</option>)}
         </select>
 
         <label className="field">System Prompt</label>
