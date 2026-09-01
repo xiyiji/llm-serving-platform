@@ -1,0 +1,13 @@
+{
+  "num_requests": 300,
+  "concurrency": 16,
+  "unique_prompts": true,
+  "p50_latency_ms": 77.0,
+  "p95_latency_ms": 108.3,
+  "p99_latency_ms": 131.9,
+  "mean_latency_ms": 80.8,
+  "throughput_rps": 189.8,
+  "error_rate": 0.0,
+  "cache_hit_pct": 0.0,
+  "wall_time_s": 1.58
+}
