@@ -4,6 +4,8 @@ A self-hosted serving layer for LLM inference: one OpenAI-compatible gateway in
 front of your model engines, with adaptive routing, dynamic micro-batching,
 prefix caching, cold-start management, canary releases and a real ops console.
 
+**Live demo:** [llm-serving-platform.vercel.app](https://llm-serving-platform.vercel.app) — console on Vercel, gateway on Render; with a GPU engine attached, chat responses stream from a real vLLM instance through the full gateway path.
+
 Point any OpenAI SDK at it:
 
 ```python
