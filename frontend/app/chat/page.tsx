@@ -57,6 +57,7 @@ export default function ChatPage() {
       ],
       temperature,
       stream: streaming,
+      max_tokens: 256,
     };
     const auth = apiKey ? `  -H 'Authorization: Bearer ${apiKey}' \\\n` : "";
     return `curl -X POST ${apiBase}/v1/chat/completions \\\n  -H 'Content-Type: application/json' \\\n${auth}  -d '${JSON.stringify(body, null, 2)}'`;
@@ -97,6 +98,7 @@ export default function ChatPage() {
       ],
       temperature,
       stream: streaming,
+      max_tokens: 256,
     };
 
     const started = performance.now();

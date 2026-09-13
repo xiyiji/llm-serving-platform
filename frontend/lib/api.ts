@@ -85,4 +85,5 @@ export async function streamChat(
       }
     }
   }
+  throw new Error("Response interrupted before completion. Please try again.");
 }
