@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
+import contextvars
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +21,8 @@ class _Pending:
     run: Callable[[], Awaitable[Any]]
     future: asyncio.Future = field(default_factory=asyncio.Future)
     enqueued_at: float = field(default_factory=time.perf_counter)
+    task: asyncio.Task | None = None
+    context: contextvars.Context = field(default_factory=contextvars.copy_context)
 
 
 class BatchScheduler:
@@ -55,7 +58,13 @@ class BatchScheduler:
                 self._dispatch_locked()
             elif self._flush_task is None or self._flush_task.done():
                 self._flush_task = asyncio.create_task(self._window_flush())
-        return await pending.future
+        try:
+            return await pending.future
+        except asyncio.CancelledError:
+            if pending.task is not None:
+                pending.task.cancel()
+                await asyncio.gather(pending.task, return_exceptions=True)
+            raise
 
     async def _window_flush(self) -> None:
         await asyncio.sleep(self.window_ms / 1000)
@@ -76,14 +85,39 @@ class BatchScheduler:
         asyncio.create_task(self._run_batch(batch))
 
     async def _run_batch(self, batch: list[_Pending]) -> None:
-        results = await asyncio.gather(*(p.run() for p in batch), return_exceptions=True)
-        for p, result in zip(batch, results):
+        async def execute(p: _Pending) -> None:
             if p.future.cancelled():
-                continue
-            if isinstance(result, BaseException):
-                p.future.set_exception(result)
-            else:
-                p.future.set_result(result)
+                return
+            task = asyncio.create_task(p.run(), context=p.context)
+            p.task = task
+            def cancel_work(future):
+                if future.cancelled():
+                    task.cancel()
+            p.future.add_done_callback(cancel_work)
+            try:
+                result = await task
+                if not p.future.done():
+                    p.future.set_result(result)
+            except BaseException as exc:
+                if not p.future.done():
+                    p.future.set_exception(exc)
+            finally:
+                p.future.remove_done_callback(cancel_work)
+        await asyncio.gather(*(execute(p) for p in batch))
+
+    async def submit_stream(self, stream: AsyncIterator[str]) -> AsyncIterator[str]:
+        """Batch stream startup; subsequent deltas retain consumer backpressure."""
+        sentinel = object()
+        async def first():
+            return await anext(stream, sentinel)
+        try:
+            delta = await self.submit(first)
+            if delta is not sentinel:
+                yield delta
+                async for delta in stream:
+                    yield delta
+        finally:
+            await stream.aclose()
 
     def stats(self) -> dict:
         return {

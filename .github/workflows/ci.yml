@@ -37,6 +37,20 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Validate infrastructure without AWS credentials
+        working-directory: deploy/terraform
+        run: |
+          terraform fmt -check
+          terraform init -backend=false -input=false
+          terraform validate
+
   docker-build:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-build]

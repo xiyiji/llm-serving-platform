@@ -136,6 +136,10 @@ class RegisterModelRequest(BaseModel):
     source: str | None = None
 
 
+class PromoteModelRequest(BaseModel):
+    stage: Literal["dev", "staging", "production"]
+
+
 class RegistryInfo(BaseModel):
     model_id: str
     version: str

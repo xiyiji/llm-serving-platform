@@ -27,7 +27,7 @@ reply = client.chat.completions.create(
 | Console | Next.js 14 (App Router), React 18, TypeScript, Recharts |
 | Observability | prometheus-client, Prometheus, Grafana (dashboard committed), alert rules |
 | Delivery | Docker, docker-compose, Kubernetes manifests, Terraform (ECR + EKS), GitHub Actions |
-| Tests | pytest + pytest-asyncio (27 tests), CI on Python 3.11/3.12, containerised smoke test |
+| Tests | pytest + pytest-asyncio (38 tests), CI on Python 3.11/3.12, containerised smoke test |
 
 ## What's inside
 
@@ -172,9 +172,13 @@ container on every push.
 
 ## Roadmap
 
+See [governance, streaming and tracing](docs/GOVERNANCE-TRACING.md) for the
+promote JSON contract, Admin operations, cache/scheduler boundaries, OTLP setup
+and EKS connection outputs.
+
 - Wire the default backend to a live vLLM instance and publish GPU-backed
   benchmark curves alongside the simulated ones
 - Move registry and release state from memory to SQLite/Postgres, cache to
   Redis, so the gateway scales horizontally
-- OpenTelemetry spans end to end (gateway → adapter → engine)
+- Engine-internal spans (gateway and upstream HTTP tracing are implemented)
 - Per-key usage accounting and cost attribution

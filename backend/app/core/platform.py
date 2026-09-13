@@ -13,6 +13,7 @@ Request path::
 from __future__ import annotations
 
 import logging
+import asyncio
 import time
 from collections.abc import AsyncIterator
 
@@ -124,26 +125,52 @@ class Platform:
             ACTIVE.dec()
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
-        """Yield text deltas; metrics recorded when the stream ends."""
+        """Cache complete streams separately from responses; never cache partial output."""
         model = request.model or self.settings.default_model
+        key = "stream:" + self._cache_key(request, model)
+        cached = self.kv_cache.lookup(key)
+        CACHE_HITS.labels(result="hit" if cached is not None else "miss").inc()
+        if cached is not None:
+            for delta in cached:
+                yield delta
+            return
         start = time.perf_counter()
         ACTIVE.inc()
-        adapter = self.router.route(model)
+        adapter = None
         error = False
+        chunks = []
+        cache_bytes = 0
+        cacheable = True
         try:
+            adapter = self.router.route(model)
             pooled = await self.warm_pool.acquire(model, adapter.name)
             if pooled.load_time_s:
                 COLD_START.observe(pooled.load_time_s)
-            async for delta in adapter.stream(request, model):
-                yield delta
-        except Exception:
+            stream = self.batcher.submit_stream(adapter.stream(request, model))
+            try:
+                async for delta in stream:
+                    cache_bytes += len(delta.encode("utf-8"))
+                    if cache_bytes > 1024 * 1024:
+                        cacheable = False
+                        chunks.clear()
+                    if cacheable:
+                        chunks.append(delta)
+                    yield delta
+            finally:
+                await stream.aclose()
+            if cacheable:
+                self.kv_cache.store(key, tuple(chunks))
+            pooled.request_count += 1
+            pooled.total_latency_ms += (time.perf_counter() - start) * 1000
+        except (Exception, asyncio.CancelledError, GeneratorExit):
             error = True
             raise
         finally:
             latency_ms = (time.perf_counter() - start) * 1000
-            adapter.record(latency_ms, error=error)
+            if adapter is not None:
+                adapter.record(latency_ms, error=error)
             self.window.observe(latency_ms, error=error)
-            REQUESTS.labels(endpoint="chat_stream", model=model, backend=adapter.name).inc()
+            REQUESTS.labels(endpoint="chat_stream", model=model, backend=adapter.name if adapter else "unrouted").inc()
             LATENCY.labels(endpoint="chat_stream").observe(latency_ms / 1000)
             ACTIVE.dec()
             self._evaluate_alerts()

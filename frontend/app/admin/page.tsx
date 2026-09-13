@@ -42,14 +42,45 @@ export default function AdminPage() {
     useCallback(() => getJson(apiBase, "/v1/alerts", apiKey), [apiBase, apiKey]), 6000);
   const [deployments, , refreshDeps] = usePoll<any>(
     useCallback(() => getJson(apiBase, "/v1/deployments", apiKey), [apiBase, apiKey]), 6000);
-  const [registry] = usePoll<any>(
+  const [registry, , refreshRegistry] = usePoll<any>(
     useCallback(() => getJson(apiBase, "/v1/registry", apiKey), [apiBase, apiKey]), 10000);
-  const [pool] = usePoll<any>(
+  const [pool, , refreshPool] = usePoll<any>(
     useCallback(() => getJson(apiBase, "/v1/cold-start/pool", apiKey), [apiBase, apiKey]), 6000);
 
   const [version, setVersion] = useState("v1.2.0");
   const [trafficPct, setTrafficPct] = useState(10);
   const [opMsg, setOpMsg] = useState<string | null>(null);
+  const [modelId, setModelId] = useState("");
+  const [modelVersion, setModelVersion] = useState("1.0.0");
+  const [stage, setStage] = useState("dev");
+  const [artifactPath, setArtifactPath] = useState("");
+  const [source, setSource] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [governanceMsg, setGovernanceMsg] = useState("");
+
+  async function govern(action: "register" | "promote" | "load" | "unload") {
+    const id = modelId.trim();
+    const ver = modelVersion.trim();
+    if (!id || ((action === "register" || action === "promote") && !ver)) return;
+    setBusy(true);
+    setGovernanceMsg("");
+    try {
+      const path = action === "register" ? "/v1/registry"
+        : action === "promote" ? `/v1/registry/${encodeURIComponent(id)}/${encodeURIComponent(ver)}/promote`
+        : `/v1/models/${encodeURIComponent(id)}/${action}`;
+      const body = action === "register"
+        ? { model_id: id, version: ver, stage, artifact_path: artifactPath.trim() || null, source: source.trim() || null }
+        : action === "promote" ? { stage } : {};
+      const result = await postJson<any>(apiBase, path, body, apiKey);
+      setGovernanceMsg(action === "unload" && !result.unloaded
+        ? `${id} was already absent from the warm pool.`
+        : `${action} succeeded: ${id}${action === "register" || action === "promote" ? `:${ver} → ${result.stage}` : ""}.`);
+      refreshRegistry();
+      refreshPool();
+    } catch (e) {
+      setGovernanceMsg(`${action} failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setBusy(false); }
+  }
 
   const offline = !!healthErr;
   const trend = demoTrend();
@@ -100,6 +131,32 @@ export default function AdminPage() {
             <div className="desc">{healthErr} — panels show placeholders until the server responds.</div>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <h2>Model governance</h2>
+        <p className="sub">Register model versions and stages. Load and unload update the gateway warm pool; engine memory management remains with the backend.</p>
+        <label className="field" htmlFor="model-id">Model ID</label>
+        <input id="model-id" className="text" value={modelId} onChange={e => setModelId(e.target.value)} list="known-models" />
+        <datalist id="known-models">{Object.keys(backends?.model_mapping ?? {}).map(id => <option key={id} value={id} />)}</datalist>
+        <label className="field" htmlFor="model-version">Model version</label>
+        <input id="model-version" className="text" value={modelVersion} onChange={e => setModelVersion(e.target.value)} />
+        <label className="field" htmlFor="model-stage">Stage</label>
+        <select id="model-stage" className="text" value={stage} onChange={e => setStage(e.target.value)}>
+          <option value="dev">dev</option><option value="staging">staging</option><option value="production">production</option>
+        </select>
+        <label className="field" htmlFor="artifact-path">Artifact path (optional)</label>
+        <input id="artifact-path" className="text" value={artifactPath} onChange={e => setArtifactPath(e.target.value)} />
+        <label className="field" htmlFor="model-source">Source (optional)</label>
+        <input id="model-source" className="text" value={source} onChange={e => setSource(e.target.value)} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+          {(["register", "promote", "load", "unload"] as const).map(action => (
+            <button key={action} className={`btn ${action === "unload" ? "danger" : "secondary"}`}
+              disabled={busy || offline || !modelId.trim() || ((action === "register" || action === "promote") && !modelVersion.trim())}
+              onClick={() => govern(action)}>{action[0].toUpperCase() + action.slice(1)}</button>
+          ))}
+        </div>
+        <p className="sub" role="status" aria-live="polite">{busy ? "Applying operation…" : governanceMsg}</p>
       </div>
 
       <div className="grid cols-4">

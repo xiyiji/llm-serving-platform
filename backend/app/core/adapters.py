@@ -32,6 +32,7 @@ class BackendAdapter(ABC):
         self.request_count = 0
         self.error_count = 0
         self.total_latency_ms = 0.0
+        self.tracer_provider = None
 
     @property
     def avg_latency_ms(self) -> float:
@@ -123,11 +124,14 @@ class OpenAICompatAdapter(BackendAdapter):
         headers = {}
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
-        return httpx.AsyncClient(
+        client = httpx.AsyncClient(
             base_url=self.config.base_url or "",
             headers=headers,
             timeout=self.config.timeout_s,
         )
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+        HTTPXClientInstrumentor.instrument_client(client, tracer_provider=self.tracer_provider)
+        return client
 
     async def health(self) -> bool:
         try:
@@ -204,6 +208,9 @@ class OpenAICompatAdapter(BackendAdapter):
                         )
                         if delta:
                             yield delta
+                    raise UpstreamUnavailableError(
+                        f"Upstream '{self.name}' stream ended before [DONE]"
+                    )
         except httpx.TimeoutException as exc:
             raise RequestTimeoutError(f"Upstream '{self.name}' timed out") from exc
         except httpx.HTTPError as exc:

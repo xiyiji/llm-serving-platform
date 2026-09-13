@@ -1,7 +1,8 @@
 """Phase 2 + 3 endpoints: platform state, ops, and governance."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, Query
+from typing import Literal
 
 from ..core.metrics import prometheus_payload
 from ..core.platform import Platform
@@ -12,6 +13,7 @@ from ..schemas import (
     DeployRequest,
     KVCacheStats,
     RegisterModelRequest,
+    PromoteModelRequest,
     RegistryInfo,
     RoutingStats,
     WarmPoolStatus,
@@ -155,5 +157,15 @@ async def register_model(req: RegisterModelRequest, request: Request) -> Registr
 
 
 @router.post("/v1/registry/{model_id}/{version}/promote", response_model=RegistryInfo)
-async def promote_model(model_id: str, version: str, stage: str, request: Request) -> RegistryInfo:
-    return _p(request).registry.promote(model_id, version, stage)
+async def promote_model(
+    model_id: str, version: str, request: Request,
+    req: PromoteModelRequest | None = None,
+    stage: Literal["dev", "staging", "production"] | None = Query(default=None),
+) -> RegistryInfo:
+    from ..errors import GatewayError
+
+    if req is None and stage is None:
+        raise GatewayError("Provide stage in the JSON body or query", code="VALIDATION_FAILED", status_code=422)
+    if req is not None and stage is not None and req.stage != stage:
+        raise GatewayError("Body and query stage disagree", code="VALIDATION_FAILED", status_code=422)
+    return _p(request).registry.promote(model_id, version, req.stage if req else stage)

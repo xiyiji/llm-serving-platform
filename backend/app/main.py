@@ -13,12 +13,17 @@ from .api import generate, platform_api
 from .config import APP_VERSION, get_settings
 from .core.platform import Platform
 from .errors import install_error_handlers
+from .core.tracing import make_tracer_provider
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry import trace
 
 log = logging.getLogger("gateway")
 
 
-def create_app(settings=None) -> FastAPI:
+def create_app(settings=None, tracer_provider=None) -> FastAPI:
     settings = settings or get_settings()
+    owns_provider = tracer_provider is None
+    tracer_provider = tracer_provider or make_tracer_provider()
     logging.basicConfig(
         level=settings.log_level,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -27,13 +32,19 @@ def create_app(settings=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.platform = Platform(settings)
+        for adapter in app.state.platform.adapters:
+            adapter.tracer_provider = tracer_provider
         log.info(
             "gateway up: %d backend(s), routing=%s, batching=%s, kv_cache=%s",
             len(settings.backends), settings.routing_strategy,
             settings.batch_enabled, settings.kv_cache_enabled,
         )
-        yield
-        log.info("gateway shutting down")
+        try:
+            yield
+        finally:
+            if owns_provider:
+                tracer_provider.shutdown()
+            log.info("gateway shutting down")
 
     app = FastAPI(
         title="LLM Serving Platform",
@@ -92,15 +103,17 @@ def create_app(settings=None) -> FastAPI:
         elapsed_ms = (time.perf_counter() - start) * 1000
         response.headers["x-request-id"] = trace_id
         if request.url.path != "/metrics":
+            context = trace.get_current_span().get_span_context()
             log.info(
-                "trace=%s %s %s -> %d %.1fms",
-                trace_id, request.method, request.url.path,
+                "request_id=%s trace_id=%032x %s %s -> %d %.1fms",
+                trace_id, context.trace_id, request.method, request.url.path,
                 response.status_code, elapsed_ms,
             )
         return response
 
     app.include_router(generate.router)
     app.include_router(platform_api.router)
+    FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider, excluded_urls="/metrics")
     return app
 
 
