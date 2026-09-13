@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/", title: "Home", sub: "Project overview", icon: "⌂" },
   { href: "/chat", title: "Chat", sub: "Inference playground", icon: "💬" },
-  { href: "/admin", title: "Admin Dashboard", sub: "Platform ops console", icon: "⚙" },
+  { href: "/admin", title: "Admin", sub: "Models and status", icon: "⚙" },
 ];
 
 export default function Sidebar() {
