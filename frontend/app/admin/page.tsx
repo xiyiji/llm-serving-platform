@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_API_BASE, getJson, postJson } from "@/lib/api";
-import { demoTrend, GpuAreaChart, ThroughputLatencyChart, TrafficBarChart } from "@/components/Charts";
+import { TrafficBarChart } from "@/components/Charts";
 
 interface Health { status: string; uptime_s: number; version: string; details: Record<string, unknown>; }
 interface Backends { default_backend: string; backends: any[]; model_mapping: Record<string, string>; }
@@ -83,7 +83,6 @@ export default function AdminPage() {
   }
 
   const offline = !!healthErr;
-  const trend = demoTrend();
   const traffic = (backends?.backends ?? []).map((b: any) => ({
     name: b.name, value: b.request_count ?? 0,
   }));
@@ -113,16 +112,18 @@ export default function AdminPage() {
       <div className="card">
         <div className="grid cols-2eq">
           <div>
-            <h2>⚙ Admin Dashboard</h2>
-            <p className="sub">Observability, backend routing and serving controls.</p>
+            <h2>Admin</h2>
+            <p className="sub">Check gateway status below. Open Model operations to register or update a version.</p>
           </div>
           <div>
-            <input className="text" value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
+            <details><summary>Connection settings</summary>
+            <input aria-label="API Base" className="text" value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
             <input
               className="text" style={{ marginTop: 8 }} type="password"
               placeholder="API key (optional)"
               value={apiKey} onChange={(e) => setApiKey(e.target.value)}
             />
+            </details>
           </div>
         </div>
         {offline && (
@@ -133,9 +134,10 @@ export default function AdminPage() {
         )}
       </div>
 
-      <div className="card">
-        <h2>Model governance</h2>
+      <details className="card">
+        <summary>Model operations <span>Register → Promote → Warm pool</span></summary>
         <p className="sub">Register model versions and stages. Load and unload update the gateway warm pool; engine memory management remains with the backend.</p>
+        <ol><li>Enter a model ID and version, then Register.</li><li>Choose a stage and Promote to update its metadata.</li><li>Load / Unload changes the gateway warm-pool record, not GPU memory.</li></ol>
         <label className="field" htmlFor="model-id">Model ID</label>
         <input id="model-id" className="text" value={modelId} onChange={e => setModelId(e.target.value)} list="known-models" />
         <datalist id="known-models">{Object.keys(backends?.model_mapping ?? {}).map(id => <option key={id} value={id} />)}</datalist>
@@ -157,7 +159,10 @@ export default function AdminPage() {
           ))}
         </div>
         <p className="sub" role="status" aria-live="polite">{busy ? "Applying operation…" : governanceMsg}</p>
-      </div>
+        <h3>Registered versions</h3>
+        {(registry?.models ?? []).map((m: any) => <div className="list-tile" key={`${m.model_id}:${m.version}`}>{m.model_id} · {m.version} <span className="pill neutral">{m.stage}</span></div>)}
+        {(registry?.models ?? []).length === 0 && <p className="sub">No registered versions yet.</p>}
+      </details>
 
       <div className="grid cols-4">
         <div className="card metric">
@@ -171,9 +176,9 @@ export default function AdminPage() {
           <div className="hint">Average requests per micro-batch</div>
         </div>
         <div className="card metric">
-          <div className="label"><span>KV hit rate</span><span className="icon-chip">◫</span></div>
+          <div className="label"><span>Response cache hit rate</span><span className="icon-chip">◫</span></div>
           <div className="value">{kv ? `${Math.round((kv.hit_rate ?? 0) * 100)}%` : "—"}</div>
-          <div className="hint">Prefix cache effectiveness</div>
+          <div className="hint">Gateway responses, not GPU KV tensors</div>
         </div>
         <div className="card metric">
           <div className="label"><span>Default backend</span><span className="icon-chip">≡</span></div>
@@ -182,13 +187,12 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <details className="card"><summary>Advanced diagnostics <span>Alerts, routing and release controls</span></summary>
       <div className="grid cols-2">
         <div className="card">
-          <h2>◔ Serving Performance</h2>
-          <p className="sub">Latency, throughput and GPU trend visualization.</p>
-          <ThroughputLatencyChart data={trend} />
-          <div style={{ height: 12 }} />
-          <GpuAreaChart data={trend} />
+          <h2>GPU performance</h2>
+          <p className="sub">Live GPU telemetry is not connected to this console. No synthetic chart is displayed as live data.</p>
+          <a href="https://github.com/xiyiji/slo-aware-vllm">View the controlled scheduler experiment →</a>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -198,10 +202,10 @@ export default function AdminPage() {
             {(alerts?.active?.length ?? 0) === 0 && (
               <div className="list-tile">
                 <div className="row">
-                  <div className="name">No alerts firing</div>
-                  <span className="pill ok">healthy</span>
+                  <div className="name">{alerts ? "No alerts firing" : "Alert status unavailable"}</div>
+                  <span className="pill neutral">{alerts ? "no active alerts" : "unknown"}</span>
                 </div>
-                <div className="desc">Latency, error rate, queue depth and cold starts inside thresholds.</div>
+                <div className="desc">No active alert is not a GPU readiness or inference success check.</div>
               </div>
             )}
             {(alerts?.active ?? []).map((a: any) => (
@@ -317,6 +321,7 @@ export default function AdminPage() {
           ))}
         </div>
       </div>
+      </details>
     </>
   );
 }

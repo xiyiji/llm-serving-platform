@@ -129,3 +129,41 @@ input.text:focus, select.text:focus, textarea.text:focus { outline: 2px solid #b
 table.plain { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.plain th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 table.plain td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+
+.sidebar { width: 220px; }
+.chat-layout { display: flex; flex-direction: column; gap: 16px; }
+.chat-main { order: 0; }
+.advanced-settings { order: 1; }
+summary { cursor: pointer; font-weight: 650; padding: 4px 0; }
+summary span { color: var(--muted); font-size: 12px; margin-left: 12px; font-weight: 400; }
+details[open] > summary { margin-bottom: 18px; }
+.chat-empty { text-align: center; padding: 55px 20px 25px; }
+.chat-empty h3 { font-size: 28px; letter-spacing: -.6px; margin: 12px 0; }
+.chat-empty p, .start-card p { color: var(--muted); line-height: 1.7; }
+.suggestions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 25px 0; }
+.suggestions .btn { font-weight: 400; font-size: 13px; }
+.eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .13em; }
+.welcome { padding: 50px; background: linear-gradient(120deg, #fff, #edf3ff); }
+.welcome h1 { font-size: clamp(30px, 4vw, 52px); line-height: 1.12; letter-spacing: -1.5px; margin: 20px 0; }
+.welcome p { max-width: 620px; color: var(--muted); font-size: 17px; line-height: 1.7; margin-bottom: 28px; }
+.welcome .btn { display: inline-block; }
+.start-card { padding: 30px; border: 1px solid transparent; }
+.start-card:hover { border-color: #bfd2f7; }
+.start-card h2 { margin-top: 18px; }
+.flow-line { padding: 18px; background: var(--bg); border-radius: 12px; line-height: 1.7; }
+@media (max-width: 1100px) { .sidebar { width: 100%; } }
+@media (max-width: 600px) {
+  .shell { padding: 10px; gap: 12px; }
+  .sidebar { padding: 14px; }
+  .sidebar h1 { display: none; }
+  .sidebar .brand { margin-bottom: 12px; }
+  .sidebar > a { display: inline-block; width: 33.33%; }
+  .nav-item { padding: 10px 6px; margin: 0 4px 0 0; }
+  .nav-item .sub, .nav-item > span { display: none; }
+  .card, .welcome { padding: 20px; }
+  .chat-empty { padding: 30px 0 10px; }
+  .chat-empty h3 { font-size: 23px; }
+  .chat-main > div:first-child { flex-wrap: wrap; gap: 8px; }
+  .msg { max-width: 95%; }
+  .grid.cols-4 { grid-template-columns: 1fr; }
+}

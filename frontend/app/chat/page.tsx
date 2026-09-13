@@ -10,7 +10,7 @@ import {
   type CompletionResponse,
 } from "@/lib/api";
 
-const DEFAULT_MODELS = ["llama-3.1-8b-instruct", "mistral-7b-instruct"];
+const DEFAULT_MODELS = ["qwen2.5-7b-instruct"];
 
 interface UiMessage extends ChatMessage {
   meta?: string;
@@ -43,16 +43,8 @@ export default function ChatPage() {
   const [temperature, setTemperature] = useState(0.7);
   const [streaming, setStreaming] = useState(true);
   const [connection, setConnection] = useState<"idle" | "checking" | "healthy" | "down">("idle");
-  const [input, setInput] = useState(
-    "Explain how adaptive routing, batching, and KV-cache work together in an LLM serving platform."
-  );
-  const [messages, setMessages] = useState<UiMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Console ready. Set your base URL and send a real request to /v1/chat/completions.",
-    },
-  ]);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<UiMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -158,13 +150,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="grid cols-2" style={{ gridTemplateColumns: "420px 1fr", alignItems: "start" }}>
-      <div className="card">
-        <h2>▢ Configuration</h2>
-        <p className="sub">Wire the console directly to your backend.</p>
+    <div className="chat-layout">
+      <details className="card advanced-settings">
+        <summary>Advanced settings <span>Connection, model and generation</span></summary>
+        <p className="sub">Defaults are ready to use. Change these only when connecting a different backend.</p>
 
         <label className="field">API Base</label>
-        <input className="text" value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
+        <input aria-label="API Base" className="text" value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
 
         <label className="field">API Key</label>
         <input
@@ -188,7 +180,7 @@ export default function ChatPage() {
         </div>
 
         <label className="field">Model</label>
-        <select className="text" value={model} onChange={(e) => setModel(e.target.value)}>
+        <select aria-label="Model" className="text" value={model} onChange={(e) => setModel(e.target.value)}>
           {models.map((m) => <option key={m}>{m}</option>)}
         </select>
 
@@ -224,13 +216,13 @@ export default function ChatPage() {
 
         <label className="field">cURL Preview</label>
         <div className="code-block">{curl}</div>
-      </div>
+      </details>
 
-      <div className="card">
+      <div className="card chat-main">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h2>▷ Chat Playground</h2>
-            <p className="sub">Calls your real <code>/v1/chat/completions</code> endpoint.</p>
+            <h2>Chat with your model</h2>
+            <p className="sub">Ask a question. Watch the GPU-powered response arrive.</p>
           </div>
           <div className="badge-row">
             <span className="chip">Model: {model}</span>
@@ -238,11 +230,20 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="chat-scroll" ref={scrollRef}>
+        <div className="chat-scroll" ref={scrollRef} role="log" aria-label="Conversation">
+          {messages.length === 0 && <div className="chat-empty">
+            <div className="eyebrow">YOUR INFERENCE PLAYGROUND</div>
+            <h3>What would you like to explore?</h3>
+            <p>No setup needed for the default connection. Choose an example or type below.</p>
+            <div className="suggestions">{["Explain continuous batching in three sentences.", "Why does KV caching make inference faster?", "Write a short Python async example."].map(text =>
+              <button className="btn secondary" key={text} onClick={() => setInput(text)}>{text}</button>)}</div>
+            <p className="sub">Live GPU demo: availability depends on the inference server being online.</p>
+          </div>}
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role} ${m.error ? "error" : ""}`}>
               <div className="role">{m.role}</div>
-              <div>{m.content}</div>
+              <div style={{ whiteSpace: "pre-wrap" }}>{m.content || (busy ? "Waiting for the model…" : "")}</div>
+              {m.error && <p className="sub">The GPU server may be offline. Check Advanced settings; a healthy gateway alone does not confirm GPU readiness.</p>}
               {m.meta && <div className="meta">{m.meta}</div>}
             </div>
           ))}
@@ -250,10 +251,10 @@ export default function ChatPage() {
 
         <div style={{ marginTop: 14 }}>
           <textarea
-            className="text" rows={3} value={input}
+            aria-label="Your message" placeholder="Ask your model anything…" className="text" rows={3} value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send();
               }
@@ -261,10 +262,10 @@ export default function ChatPage() {
           />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, alignItems: "center" }}>
             <div className="badge-row">
-              <span className="chip">OpenAI-compatible</span>
-              <span className="chip">Bearer auth supported</span>
+              <span className="sub">Enter to send · Shift + Enter for a new line</span>
+              {messages.length > 0 && <button className="btn secondary" disabled={busy} onClick={() => setMessages([])}>New chat</button>}
             </div>
-            <button className="btn" onClick={send} disabled={busy}>
+            <button className="btn" onClick={send} disabled={busy || !input.trim()}>
               {busy ? "Generating…" : "Send"}
             </button>
           </div>
