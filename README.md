@@ -1,8 +1,27 @@
+<div align="center">
+
 # LLM Serving Platform
 
-A self-hosted serving layer for LLM inference: one OpenAI-compatible gateway in
-front of your model engines, with adaptive routing, dynamic micro-batching,
-prefix caching, cold-start management, canary releases and a real ops console.
+### A production-shaped control plane for low-latency LLM inference
+
+OpenAI-compatible serving with adaptive routing, dynamic micro-batching,
+prefix caching, streaming, release controls, and end-to-end observability.
+
+[![CI](https://github.com/xiyiji/llm-serving-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/xiyiji/llm-serving-platform/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-OpenAI--compatible-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)
+![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Traces-F5A800?logo=opentelemetry&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes&logoColor=white)
+
+`adaptive routing` · `micro-batching` · `prefix cache` · `SSE streaming` ·
+`canary releases` · `Prometheus metrics`
+
+</div>
+
+This repository is the gateway and operations layer. For a real GPU data
+plane, it connects to [InferenceGateway](https://github.com/xiyiji/InferenceGateway),
+which runs Ray Serve in front of vLLM and exports GPU and KV-cache telemetry.
 
 Point any OpenAI SDK at it:
 
@@ -18,33 +37,68 @@ reply = client.chat.completions.create(
 
 ![Chat playground streaming over SSE](docs/media/chat-streaming.gif)
 
-## Tech stack
+## Architecture
 
-| Layer | Choices |
-|---|---|
-| Gateway | Python 3.11, FastAPI, Uvicorn, Pydantic v2, httpx (async), SSE streaming |
-| Serving internals | asyncio micro-batch scheduler, LRU prefix cache, warm pool with LRU/LFU/TTL eviction, latency-aware router, token-bucket rate limiting |
-| Console | Next.js 14 (App Router), React 18, TypeScript, Recharts |
-| Observability | prometheus-client, Prometheus, Grafana (dashboard committed), alert rules |
-| Delivery | Docker, docker-compose, Kubernetes manifests, Terraform (ECR + EKS), GitHub Actions |
-| Tests | pytest + pytest-asyncio (38 tests), CI on Python 3.11/3.12, containerised smoke test |
+```mermaid
+flowchart LR
+    SDK[OpenAI SDK / curl] --> API[FastAPI gateway]
+    UI[Next.js ops console] --> API
 
-## What's inside
+    subgraph CONTROL[LLM Serving Platform · control plane]
+        API --> GUARD[Auth + rate limit]
+        GUARD --> CACHE{Prefix cache}
+        CACHE -->|miss| POOL[Warm pool]
+        POOL --> ROUTER[Adaptive router]
+        ROUTER --> BATCH[Dynamic micro-batcher]
+        BATCH --> ADAPTER[OpenAI-compatible adapters]
+        CACHE -->|hit| RESPONSE[Response]
+    end
 
+    subgraph ENGINE[InferenceGateway · optional GPU data plane]
+        RAY[Ray Serve ingress] --> VLLM[vLLM AsyncLLMEngine]
+        VLLM --> GPU[CUDA GPU]
+    end
+
+    ADAPTER -->|HTTP + SSE| RAY
+    ADAPTER --> OTHER[Simulator / TGI / Ollama]
+    RAY --> RESPONSE
+    OTHER --> RESPONSE
+    API -. W3C traces .-> OTEL[OpenTelemetry]
+    GPU -. DCGM + vLLM metrics .-> OBS[Prometheus + Grafana]
 ```
-                        ┌──────────────────────────────────────────────┐
-   OpenAI SDK / curl →  │  Gateway (FastAPI)                           │
-   Next.js console   →  │                                              │
-                        │  auth ─ rate limit ─ KV cache ─ warm pool    │
-                        │            │                                 │
-                        │         router ── batch scheduler            │
-                        │            │                                 │
-                        │      backend adapters                        │
-                        └──────┬───────────────┬──────────────────────┘
-                               │               │
-                        simulated engine   any OpenAI-compatible engine
-                        (default, no GPU)  (vLLM / TGI / Ollama / ...)
-```
+
+The two batching layers solve different problems: this gateway groups
+near-simultaneous requests before dispatch, while vLLM performs engine-level
+continuous batching and GPU KV-block scheduling inside the companion engine.
+
+## Technology stack
+
+| Layer | Technology | Responsibility |
+|---|---|---|
+| API gateway | Python 3.11/3.12, FastAPI, Uvicorn, Pydantic v2, async httpx | OpenAI-compatible API, SSE streaming, backend normalization |
+| Traffic control | Adaptive router, token bucket, warm pool | Backend selection, overload protection, cold-start coordination |
+| Latency path | asyncio micro-batcher, LRU prefix cache | Request coalescing and cached response fast path |
+| GPU engine integration | Ray Serve + vLLM `AsyncLLMEngine` via [InferenceGateway](https://github.com/xiyiji/InferenceGateway) | Continuous batching, PagedAttention, GPU execution |
+| GPU telemetry integration | vLLM metrics + NVIDIA DCGM Exporter | GPU utilization and KV-cache occupancy in the companion stack |
+| Observability | OpenTelemetry, Prometheus, Grafana, alert rules | Distributed traces, serving metrics, dashboards, alerts |
+| Operations UI | Next.js 14, React 18, TypeScript, Recharts | Chat playground, routing health, cache/batch state, release controls |
+| Delivery | Docker Compose, Kubernetes, Terraform, AWS ECR/EKS, GitHub Actions | Local stack, deployment manifests, infrastructure and CI |
+| Verification | pytest, pytest-asyncio, container smoke test, benchmark harness | 38 tests plus reproducible latency/throughput runs |
+
+## What is implemented here
+
+| Capability | Status | Scope |
+|---|---|---|
+| OpenAI-compatible completions + SSE | Implemented | Gateway |
+| Adaptive multi-backend routing | Implemented | Gateway |
+| Dynamic request micro-batching | Implemented | Gateway scheduling, not GPU continuous batching |
+| Prefix response cache + warm pool | Implemented | Gateway, not tensor KV-block storage |
+| Canary / rolling / blue-green controls | Implemented | In-memory control-plane workflow |
+| W3C trace propagation + Prometheus | Implemented | Gateway to upstream HTTP boundary |
+| Ray Serve + vLLM + PagedAttention | Companion integration | Implemented in `xiyiji/InferenceGateway` |
+| GPU utilization + KV-cache tracking | Companion integration | DCGM and vLLM metrics in `xiyiji/InferenceGateway` |
+
+## Serving path
 
 The gateway ships with a simulated engine so the whole platform — streaming,
 routing, batching, caching, releases, dashboards — runs on a laptop with no
@@ -93,7 +147,9 @@ docker compose up --build
 # console http://localhost:3000 · prometheus :9090 · grafana :3001
 ```
 
-## Numbers
+## Measured performance
+
+### Gateway benchmark with the built-in simulator
 
 `bench/benchmark.py` drives the gateway with a closed-loop async load
 generator. On the simulated engine (300 requests, concurrency 16, one
@@ -110,9 +166,11 @@ is not noise — it is the cold start of the second model (~1.2 s load),
 captured exactly where a tail percentile should capture it. Rerun with
 `make bench`, or `--unique-prompts` for the cache-off case.
 
-The same harness, pointed at the deployed public chain — gateway on Render
-fronting a vLLM engine (Qwen2.5-7B-Instruct on an RTX 4090, RunPod) — with
-60 requests at concurrency 8, over the public internet:
+### Recorded GPU-backed run
+
+A separate benchmark run pointed the Render gateway at an on-demand vLLM
+engine serving Qwen2.5-7B-Instruct on an RTX 4090 (RunPod). With 60 requests
+at concurrency 8 over the public internet, it recorded:
 
 | Scenario | p50 | p95 | Throughput | Cache hits | Errors |
 |---|---|---|---|---|---|
@@ -124,6 +182,10 @@ public network hops. With repeated prompts the gateway's prefix cache
 answers the median request in 91 ms — **37× under the GPU path** — while
 misses still stream from the engine. That gap is the reason the gateway
 layer exists.
+
+The RunPod engine was an on-demand benchmark target, not an always-on hosted
+dependency. The repository remains fully runnable with the built-in simulator;
+live GPU inference requires a currently reachable upstream engine.
 
 ## Plugging in a real engine
 
