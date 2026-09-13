@@ -170,7 +170,7 @@ export default function ChatPage() {
           <div className="row">
             <div>
               <div className="name">Connection</div>
-              <div className="desc">Checks /health on your server</div>
+              <div className="desc">Gateway reachability, not GPU readiness</div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <span className={`pill ${connection === "healthy" ? "ok" : connection === "down" ? "crit" : "neutral"}`}>

@@ -166,7 +166,7 @@ export default function AdminPage() {
 
       <div className="grid cols-4">
         <div className="card metric">
-          <div className="label"><span>Platform health</span><span className="icon-chip">♥</span></div>
+          <div className="label"><span>Gateway health</span><span className="icon-chip">♥</span></div>
           <div className="value">{health?.status ?? "—"}</div>
           <div className="hint">/health · v{health?.version ?? "?"} · up {Math.round(health?.uptime_s ?? 0)}s</div>
         </div>
