@@ -203,9 +203,12 @@ class OpenAICompatAdapter(BackendAdapter):
                         payload = line[5:].strip()
                         if payload == "[DONE]":
                             return
-                        delta = (
-                            json.loads(payload)["choices"][0].get("delta", {}).get("content")
-                        )
+                        event = json.loads(payload)
+                        if event.get("error"):
+                            raise UpstreamUnavailableError(f"Upstream '{self.name}' reported a stream error")
+                        # OpenAI final usage events legitimately contain choices: [].
+                        choices = event.get("choices", [])
+                        delta = choices[0].get("delta", {}).get("content") if choices else None
                         if delta:
                             yield delta
                     raise UpstreamUnavailableError(

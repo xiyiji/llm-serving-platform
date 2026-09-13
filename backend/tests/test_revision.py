@@ -136,6 +136,20 @@ async def test_truncated_upstream_not_cached():
 
 
 @pytest.mark.asyncio
+async def test_upstream_final_usage_event_has_empty_choices():
+    import httpx
+    from app.config import BackendConfig
+    from app.core.adapters import OpenAICompatAdapter
+    adapter = OpenAICompatAdapter(BackendConfig(name='primary', base_url='http://test'))
+    body = 'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'
+    body += 'data: {"choices":[],"usage":{"completion_tokens":1}}\n\n'
+    body += 'data: [DONE]\n\n'
+    adapter._client = lambda: httpx.AsyncClient(base_url='http://test',
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, text=body)))
+    assert [c async for c in adapter.stream(CompletionRequest(prompt='hello'), 'qwen')] == ['ok']
+
+
+@pytest.mark.asyncio
 async def test_cancel_during_first_delta_closes_upstream():
     p = Platform(make_settings())
     entered = asyncio.Event()
