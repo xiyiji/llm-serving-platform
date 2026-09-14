@@ -50,7 +50,7 @@ async def one_request(
 
 
 async def run(
-    base_url: str, n: int, concurrency: int, unique: bool, model: str | None
+    base_url: str, n: int, concurrency: int, unique: bool, model: str | None, salt: str = ""
 ) -> dict:
     sem = asyncio.Semaphore(concurrency)
     latencies: list[float] = []
@@ -69,7 +69,8 @@ async def run(
         print(f"# target model: {model or '(gateway default)'}")
         async def worker(i: int):
             nonlocal errors, cache_hits
-            prompt = f"[{i}] {PROMPTS[i % len(PROMPTS)]}" if unique else PROMPTS[i % len(PROMPTS)]
+            # `salt` keeps unique prompts unique across repeated runs against one gateway.
+            prompt = f"[{salt}{i}] {PROMPTS[i % len(PROMPTS)]}" if unique else PROMPTS[i % len(PROMPTS)]
             async with sem:
                 latency, ok, cached = await one_request(client, prompt, model)
             latencies.append(latency)

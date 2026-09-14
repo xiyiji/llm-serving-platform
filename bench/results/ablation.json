@@ -1,0 +1,68 @@
+{
+  "requests": 300,
+  "concurrency": 16,
+  "results": [
+    {
+      "scenario": "baseline",
+      "repeated": {
+        "num_requests": 300,
+        "concurrency": 16,
+        "unique_prompts": false,
+        "p50_latency_ms": 24.3,
+        "p95_latency_ms": 72.2,
+        "p99_latency_ms": 89.7,
+        "mean_latency_ms": 30.1,
+        "throughput_rps": 504.3,
+        "error_rate": 0.0,
+        "cache_hit_pct": 100.0,
+        "wall_time_s": 0.59,
+        "runs": [
+          {
+            "num_requests": 300,
+            "concurrency": 16,
+            "unique_prompts": false,
+            "p50_latency_ms": 24.3,
+            "p95_latency_ms": 72.2,
+            "p99_latency_ms": 89.7,
+            "mean_latency_ms": 30.1,
+            "throughput_rps": 504.3,
+            "error_rate": 0.0,
+            "cache_hit_pct": 100.0,
+            "wall_time_s": 0.59
+          }
+        ]
+      },
+      "unique": {
+        "num_requests": 300,
+        "concurrency": 16,
+        "unique_prompts": true,
+        "p50_latency_ms": 53.5,
+        "p95_latency_ms": 64.5,
+        "p99_latency_ms": 72.9,
+        "mean_latency_ms": 53.5,
+        "throughput_rps": 288.1,
+        "error_rate": 0.0,
+        "cache_hit_pct": 0.0,
+        "wall_time_s": 1.04,
+        "runs": [
+          {
+            "num_requests": 300,
+            "concurrency": 16,
+            "unique_prompts": true,
+            "p50_latency_ms": 53.5,
+            "p95_latency_ms": 64.5,
+            "p99_latency_ms": 72.9,
+            "mean_latency_ms": 53.5,
+            "throughput_rps": 288.1,
+            "error_rate": 0.0,
+            "cache_hit_pct": 0.0,
+            "wall_time_s": 1.04
+          }
+        ]
+      },
+      "routing_split": {
+        "primary": 319
+      }
+    }
+  ]
+}

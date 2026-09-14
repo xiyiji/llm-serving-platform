@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import random
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -32,17 +33,32 @@ class BackendAdapter(ABC):
         self.request_count = 0
         self.error_count = 0
         self.total_latency_ms = 0.0
+        self.ewma_latency_ms: float | None = None
         self.tracer_provider = None
 
     @property
     def avg_latency_ms(self) -> float:
         return self.total_latency_ms / self.request_count if self.request_count else 0.0
 
+    # Routing signal: an exponentially weighted moving average, so one slow
+    # sample (a cold start, a GC pause) decays instead of poisoning a lifetime
+    # mean, and a replica that degrades later is noticed.
+    EWMA_ALPHA = 0.2
+
     def record(self, latency_ms: float, *, error: bool = False) -> None:
         self.request_count += 1
         self.total_latency_ms += latency_ms
+        if self.ewma_latency_ms is None:
+            self.ewma_latency_ms = latency_ms
+        else:
+            self.ewma_latency_ms += self.EWMA_ALPHA * (latency_ms - self.ewma_latency_ms)
         if error:
             self.error_count += 1
+
+    @property
+    def routing_latency_ms(self) -> float:
+        """What the router compares. Unsampled replicas read as 0 so each is tried once."""
+        return self.ewma_latency_ms if self.ewma_latency_ms is not None else 0.0
 
     async def health(self) -> bool:
         return True
@@ -86,12 +102,21 @@ class SimulatedAdapter(BackendAdapter):
         "soon are loaded ahead of the first request that wants them.",
     ]
 
+    def __init__(self, config: BackendConfig) -> None:
+        super().__init__(config)
+        # Deterministic per-backend failure schedule so ablations are repeatable.
+        self._rng = random.Random(f"sim:{config.name}")
+
     async def generate(self, request: CompletionRequest, model: str) -> CompletionResponse:
         start = time.perf_counter()
         prompt = _prompt_of(request)
         text = self._reply(prompt, request.max_tokens)
-        # Simulate decode time proportional to output length.
-        await asyncio.sleep(min(0.2, 0.002 * len(text.split())))
+        # Simulate decode time proportional to output length (+ configured degradation).
+        await asyncio.sleep(
+            min(0.2, 0.002 * len(text.split())) + self.config.sim_extra_latency_ms / 1000
+        )
+        if self.config.sim_error_rate > 0 and self._rng.random() < self.config.sim_error_rate:
+            raise UpstreamUnavailableError(f"simulated failure on backend {self.name!r}")
         latency_ms = (time.perf_counter() - start) * 1000
         p_tok, c_tok = len(prompt.split()), len(text.split())
         return CompletionResponse(

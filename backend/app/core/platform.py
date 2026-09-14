@@ -89,6 +89,7 @@ class Platform:
 
         start = time.perf_counter()
         ACTIVE.inc()
+        adapter = None
         try:
             adapter = self.router.route(model)
             pooled = await self.warm_pool.acquire(model, adapter.name)
@@ -98,11 +99,14 @@ class Platform:
             async def run() -> CompletionResponse:
                 return await adapter.generate(request, model)
 
+            engine_start = time.perf_counter()
             response = await self.batcher.submit(run)
             latency_ms = (time.perf_counter() - start) * 1000
             response.latency_ms = round(latency_ms, 2)
 
-            adapter.record(latency_ms)
+            # The router compares replicas on engine time (queue + generate);
+            # the cold start belongs to the warm pool, not to the replica.
+            adapter.record((time.perf_counter() - engine_start) * 1000)
             pooled.request_count += 1
             pooled.total_latency_ms += latency_ms
             self.window.observe(latency_ms)
@@ -118,6 +122,10 @@ class Platform:
         except Exception as exc:
             latency_ms = (time.perf_counter() - start) * 1000
             self.window.observe(latency_ms, error=True)
+            if adapter is not None:
+                # Feed the router's health signal; without this the adaptive
+                # strategy never saw non-streaming failures.
+                adapter.record(latency_ms, error=True)
             ERRORS.labels(endpoint=endpoint, code=type(exc).__name__).inc()
             self._evaluate_alerts()
             raise

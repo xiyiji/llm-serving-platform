@@ -27,6 +27,10 @@ class BackendConfig(BaseModel):
     api_key: str | None = None
     timeout_s: float = 60.0
     models: list[str] = Field(default_factory=list)
+    # Simulated backends only: shape the engine so routing decisions are observable
+    # (a slow replica, a flaky replica). Ignored for openai_compat backends.
+    sim_extra_latency_ms: float = 0.0
+    sim_error_rate: float = 0.0
 
 
 class Settings(BaseModel):

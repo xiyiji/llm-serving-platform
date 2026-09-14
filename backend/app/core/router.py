@@ -2,9 +2,10 @@
 
 Strategies:
 - ``round_robin`` — rotate over healthy backends serving the model
-- ``latency``     — pick the healthy backend with the lowest average latency
-- ``adaptive``    — latency-based, but any backend whose recent error rate
-                    exceeds 20% is deprioritised
+- ``latency``     — pick the healthy backend with the lowest recent latency
+                    (EWMA of engine time, cold starts excluded)
+- ``adaptive``    — latency-based, but any backend whose error rate exceeds
+                    20% is deprioritised
 """
 from __future__ import annotations
 
@@ -44,11 +45,11 @@ class Router:
         if self.strategy == "round_robin":
             chosen = candidates[next(self._rr) % len(candidates)]
         elif self.strategy == "latency":
-            chosen = min(candidates, key=lambda a: a.avg_latency_ms)
+            chosen = min(candidates, key=lambda a: a.routing_latency_ms)
         else:  # adaptive
             def score(a: BackendAdapter) -> tuple:
                 err_rate = a.error_count / a.request_count if a.request_count else 0.0
-                return (err_rate > 0.2, a.avg_latency_ms)
+                return (err_rate > 0.2, a.routing_latency_ms)
             chosen = min(candidates, key=score)
 
         self.decisions[chosen.name] = self.decisions.get(chosen.name, 0) + 1
@@ -68,6 +69,7 @@ class Router:
                     "request_count": a.request_count,
                     "error_count": a.error_count,
                     "avg_latency_ms": round(a.avg_latency_ms, 2),
+                    "ewma_latency_ms": round(a.routing_latency_ms, 2),
                     "routed": self.decisions.get(a.name, 0),
                 }
             )

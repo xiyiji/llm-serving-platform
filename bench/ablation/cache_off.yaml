@@ -1,0 +1,21 @@
+# Generated scenario for bench/ablation.py (rate limiter off: this measures the data path)
+host: 127.0.0.1
+port: 8010
+default_model: llama-3.1-8b-instruct
+default_backend: primary
+routing_strategy: adaptive
+warm_pool_capacity: 4
+warm_pool_eviction: lru
+cold_start_load_s: 1.2
+batch_enabled: true
+batch_window_ms: 8
+batch_max_size: 8
+kv_cache_enabled: false
+kv_cache_capacity: 512
+rate_limit_enabled: false
+backends:
+- name: primary
+  kind: simulated
+  models:
+  - llama-3.1-8b-instruct
+  - mistral-7b-instruct

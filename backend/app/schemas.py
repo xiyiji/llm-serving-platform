@@ -58,6 +58,7 @@ class ModelInfo(BaseModel):
     backend: str
     request_count: int = 0
     avg_latency_ms: float = 0.0
+    ewma_latency_ms: float = 0.0
 
 
 class WarmPoolStatus(BaseModel):
