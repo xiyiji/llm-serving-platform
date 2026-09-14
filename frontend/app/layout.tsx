@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "LLM Serving Platform Console",
-  description: "Gateway, routing, batching, caching and ops console for LLM inference.",
+  description: "Gateway, routing, batching, caching and ops console for LLM inference. Built by Mengyun Wang.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

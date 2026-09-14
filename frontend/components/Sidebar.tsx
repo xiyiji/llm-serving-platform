@@ -26,6 +26,10 @@ export default function Sidebar() {
           </div>
         </Link>
       ))}
+      <div className="author">
+        Built by{" "}
+        <a href="https://github.com/xiyiji" target="_blank" rel="noreferrer">Mengyun Wang</a>
+      </div>
     </aside>
   );
 }
