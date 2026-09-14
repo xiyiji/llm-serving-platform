@@ -192,7 +192,7 @@ export default function AdminPage() {
         <div className="card">
           <h2>GPU performance</h2>
           <p className="sub">Live GPU telemetry is not connected to this console. No synthetic chart is displayed as live data.</p>
-          <a href="https://github.com/xiyiji/slo-aware-vllm">View the controlled scheduler experiment →</a>
+          <a href="https://github.com/xiyiji/tempo">View the controlled scheduler experiment →</a>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
