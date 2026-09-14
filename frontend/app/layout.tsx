@@ -13,7 +13,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className="shell">
           <Sidebar />
-          <main className="content">{children}</main>
+          <main className="content">
+            {children}
+            <footer className="footer">
+              Built by <a href="https://github.com/xiyiji" target="_blank" rel="noreferrer">Mengyun Wang</a> &middot;{" "}
+              <a href="https://github.com/xiyiji/llm-serving-platform" target="_blank" rel="noreferrer">source</a> &middot;{" "}
+              GPU engine: <a href="https://github.com/xiyiji/InferenceGateway" target="_blank" rel="noreferrer">InferenceGateway</a>
+            </footer>
+          </main>
         </div>
       </body>
     </html>

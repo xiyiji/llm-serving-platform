@@ -169,3 +169,6 @@ details[open] > summary { margin-bottom: 18px; }
   .msg { max-width: 95%; }
   .grid.cols-4 { grid-template-columns: 1fr; }
 }
+
+.footer { margin-top: auto; padding: 16px 4px 4px; color: var(--muted); font-size: 12px; border-top: 1px solid rgba(100,116,139,0.25); }
+.footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
